@@ -205,4 +205,6 @@ $ingestDetails->hydrate();
 
 $checkSignature->start();
 
+$loop->addTimer(5, fn () => $loop->stop());
+
 $loop->run();

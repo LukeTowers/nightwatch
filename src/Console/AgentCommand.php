@@ -3,8 +3,14 @@
 namespace Laravel\Nightwatch\Console;
 
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Support\Traits\ForwardsCalls;
 use SensitiveParameter;
 use Symfony\Component\Console\Attribute\AsCommand;
+use Throwable;
+
+use function app;
+use function date;
 
 /**
  * @internal
@@ -39,6 +45,7 @@ final class AgentCommand extends Command
 
     public function handle(): void
     {
+        // TODO: Nightwatch::disable();
         $refreshToken = $this->token;
 
         $listenOn = $this->option('listen-on') ?? $this->ingestUri;
@@ -57,6 +64,64 @@ final class AgentCommand extends Command
 
         $quiet = $this->option('quiet') ?: null;
 
+        // todo agent should use correct output.
         require __DIR__.'/../../agent/build/agent.phar';
+
+        app()->terminating(function () {
+            require 'foo.php';
+        });
+
+        $handler = app(ExceptionHandler::class);
+        app()->forgetInstance(ExceptionHandler::class);
+        app()->instance(ExceptionHandler::class, new class($handler) implements ExceptionHandler
+        {
+            use ForwardsCalls;
+
+            public function __construct(
+                private ExceptionHandler $handler,
+            ) {
+                //
+            }
+
+            public function report(Throwable $e)
+            {
+                $this->handler->report($e);
+            }
+
+            public function shouldReport(Throwable $e)
+            {
+                return $this->handler->shouldReport($e);
+            }
+
+            public function render($request, Throwable $e)
+            {
+                return $this->handler->render($request, $e);
+            }
+
+            public function renderForConsole($output, Throwable $e)
+            {
+                $warning = static function (string $message): string {
+                    return date('Y-m-d H:i:s').' [WARNING] '.$message.PHP_EOL;
+                };
+
+                if ($output->isVerbose()) {
+                    $output->write($warning(<<<MESSAGE
+                        An error occurred after the Nightwatch agent had successfully shutdown.
+
+                        {$e->getMessage()} in {$e->getFile()}:{$e->getLine()}
+                        Stack trace:
+                        {$e->getTraceAsString()}
+
+                        This should not impact the operation of Nightwatch.
+                        MESSAGE));
+                } else {
+                    $output->write($warning(<<<MESSAGE
+                        An error occurred after shutdown: [{$e->getMessage()}]
+                        To see a full stacktrace, pass the `-v` flag when calling the the agent command, e.g., `php artisan nightwatch:agent -v`
+                        This should not impact the operation of Nightwatch.
+                        MESSAGE));
+                }
+            }
+        });
     }
 }
