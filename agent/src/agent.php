@@ -199,12 +199,14 @@ $checkSignature = new CheckSignature(
  * Get things rolling...
  */
 
-$server->start();
+// $server->start();
 
-$ingestDetails->hydrate();
+// $ingestDetails->hydrate();
 
-$checkSignature->start();
+// $checkSignature->start();
 
 $loop->addTimer(5, fn () => $loop->stop());
 
 $loop->run();
+
+$info('Shutting down');
