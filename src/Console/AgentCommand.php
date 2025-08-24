@@ -68,7 +68,8 @@ final class AgentCommand extends Command
         require __DIR__.'/../../agent/build/agent.phar';
 
         app()->terminating(function () {
-            require 'foo.php';
+            unlink(__DIR__.'/Foo.php');
+            new Foo;
         });
 
         $handler = app(ExceptionHandler::class);
@@ -104,23 +105,18 @@ final class AgentCommand extends Command
                     return date('Y-m-d H:i:s').' [WARNING] '.$message.PHP_EOL;
                 };
 
-                if ($output->isVerbose()) {
-                    $output->write($warning(<<<MESSAGE
-                        An error occurred after the Nightwatch agent had successfully shutdown.
-
-                        {$e->getMessage()} in {$e->getFile()}:{$e->getLine()}
+                $output->writeln($warning('An unhandled error occurred after shutdown.'));
+                $output->writeln("{$e->getMessage()} in {$e->getFile()}:{$e->getLine()}");
+                $output->writeln($output->isVerbose()
+                    ? <<<MESSAGE
                         Stack trace:
                         {$e->getTraceAsString()}
-
-                        This should not impact the operation of Nightwatch.
-                        MESSAGE));
-                } else {
-                    $output->write($warning(<<<MESSAGE
-                        An error occurred after shutdown: [{$e->getMessage()}]
-                        To see a full stacktrace, pass the `-v` flag when calling the the agent command, e.g., `php artisan nightwatch:agent -v`
-                        This should not impact the operation of Nightwatch.
-                        MESSAGE));
-                }
+                        MESSAGE
+                    : <<<'MESSAGE'
+                        To see a full stack trace, pass the `-v` flag when calling the the agent command, e.g., `php artisan nightwatch:agent -v`
+                        MESSAGE
+                );
+                $output->writeln('This should not impact the operation of Nightwatch.');
             }
         });
     }
